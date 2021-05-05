@@ -8,3 +8,4 @@ class Config(object):
     connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or connection_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    ENV_FILE_LOCATION = os.environ.get('ENV_FILE_LOCATION')

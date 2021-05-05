@@ -1,5 +1,6 @@
 from flask_restful import Resource, reqparse
-from app.common.models import DataFormat, BaseEntity, DataSet, Task, ExperimentEnvironment, ProgramImplementation, Experiment, DataSetList
+from app.common.models import DataFormat, BaseEntity, DataSet, Task,\
+ ExperimentEnvironment, ProgramImplementation, Experiment, DataSetList, ExperimentResult
 from datetime import datetime
 from app import db
 from sqlalchemy.exc import IntegrityError
@@ -332,7 +333,7 @@ class experiments(Resource):
                 return f"DataSet with id={id} not found.", 404
             dataset = DataSet.query.filter_by(Id=id).first()
             if dataset.DataFormatId != task.DefaultInputFormat:
-                return f"DataSet Format does not match Task DefaultInputFormat.", 404
+                return f"DataSet Format does not match Task DefaultInputFormat.", 400
 
         baseentity = create_BaseEntity()
 
@@ -341,7 +342,6 @@ class experiments(Resource):
             db.session.add(new_obj)
             db.session.commit()
         except IntegrityError as e:
-            print(e)
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
             return 'Integrity error', 400
@@ -369,24 +369,21 @@ class run(Resource):
 
         experiment = Experiment.query.filter_by(Id=args['ExperimentId']).first()
         implementation = ProgramImplementation.query.filter_by(Id=args['ProgramImplementationId']).first()
+        if experiment.TaskId != implementation.TaskId:
+            return f"TaskIds do not match.", 400
+        if experiment.EnvironmentId != implementation.EnvironmentId:
+            return f"EnvironmentIds do not match.", 400
 
         baseentity = create_BaseEntity()
 
         try:
-            new_obj = Experiment(**args, BaseEntityId=baseentity.Id)
+            new_obj = ExperimentResult(**args, BaseEntityId=baseentity.Id)
             db.session.add(new_obj)
             db.session.commit()
         except IntegrityError as e:
-            print(e)
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
             return 'Integrity error', 400
-        
-        for id in datasets:
-            node = DataSetList(DataSetId=id, ExperimentId=new_obj.Id)
-            db.session.add(node)
-
-        db.session.commit()
 
         return new_obj.as_dict(), 201
 
