@@ -3,6 +3,8 @@ from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
 from flask_jwt_extended import JWTManager
+import threading
+import time
 
 
 app = Flask(__name__)
@@ -21,22 +23,15 @@ api.add_resource(implementations, '/implementations', '/implementations/<int:id>
 api.add_resource(experiments, '/experiment/experiments', '/experiment/experiments/<int:id>')
 
 
+@app.before_first_request
+def before_first_request():
+    """Start a background thread that launches tasks when machines are available."""
 
+    def launch_pending_tasks():
+        while True:
+            print('LOOP')
+            time.sleep(1)
 
-
-# from app.common.models import BaseEntity
-
-# @app.route('/delete_be', methods=['GET'])
-# def delete_all_free_be():
-#     c = 0
-#     for i in range(100):
-#         try:
-#             to_delete = BaseEntity.query.filter_by(Id=i).first()
-#             if to_delete is not None:
-#                 db.session.delete(to_delete)
-#                 db.session.commit()
-#                 c += 1
-#         except:
-#             pass
-#     print(c)
-#     return 'test'
+    if not app.config['TESTING']:
+        thread = threading.Thread(target=launch_pending_tasks)
+        thread.start()

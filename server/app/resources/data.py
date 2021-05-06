@@ -5,6 +5,18 @@ from datetime import datetime
 from app import db
 from sqlalchemy.exc import IntegrityError
 from copy import deepcopy
+import re
+
+regex = re.compile(
+    r'^(?:http|ftp)s?://' # http:// or https://
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
+    r'localhost|' #localhost...
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
+    r'(?::\d+)?' # optional port
+    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+def check_uri(uri):
+    return re.match(regex, uri)
 
 dataformat_parser = reqparse.RequestParser()
 dataformat_parser.add_argument('FormatType', type=str, required=True)
@@ -80,6 +92,7 @@ dataset_parser.add_argument('Content', type=str, required=True)
 
 class datasets(Resource):
     def get(self, id=None):
+        print(teststring)
         if id is None:
             query = DataSet.query.order_by(DataSet.Id)
             return [i.as_dict() for i in query]
@@ -198,6 +211,9 @@ class environments(Resource):
     def post(self):
         args = environment_parser.parse_args(strict=True)
 
+        if args['OS'] not in {'Win', 'Linux', 'MacOS'}:
+            return f"Unknown OS={args['OS']}.", 400
+
         baseentity = create_BaseEntity()
 
         try:
@@ -234,6 +250,8 @@ implementation_parser.add_argument('OutputFormat', type=int, required=True)
 implementation_parser.add_argument('CommandLineArgs', type=str)
 implementation_parser.add_argument('Blob', type=str, required=True)
 implementation_parser.add_argument('DataProcessing', type=int, required=True)
+implementation_parser.add_argument('ProgramType', type=str, required=True)
+implementation_parser.add_argument('PythonRequirements', type=str)
 
 class implementations(Resource):
     def get(self, id=None):
@@ -257,12 +275,21 @@ class implementations(Resource):
             return f"ExperimentEnvironment with id={args['EnvironmentId']} not found.", 404
         if not check_database(Task, args['TaskId']):
             return f"Task with id={args['TaskId']} not found.", 404
+        if args['OS'] not in {'Win', 'Linux', 'MacOS'}:
+            return f"Unknown OS={args['OS']}.", 400
+        if args['ProgramType'] not in {'Python', 'Exec'}:
+            return f"Unknown ProgramType={args['ProgramType']}.", 400
+        
+        # if not check_uri(args['Blob']):
+        #     return f"Malformed Blob URI.", 400
+        # if (args['PythonRequirements'] is not None) and (not check_uri(args['PythonRequirements'])):
+        #     return f"Malformed PythonRequirements URI.", 400
         
         task = Task.query.filter_by(Id=args['TaskId']).first()
         if task.DefaultInputFormat != args['InputFormat']:
-            return f"Input formats do not match.", 404
+            return f"Input formats do not match.", 400
         if task.DefaultOutputFormat != args['OutputFormat']:
-            return f"Output formats do not match.", 404
+            return f"Output formats do not match.", 400
 
         baseentity = create_BaseEntity()
 
