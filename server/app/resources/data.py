@@ -6,6 +6,12 @@ from app import db
 from sqlalchemy.exc import IntegrityError
 from copy import deepcopy
 import re
+import threading
+import requests
+import sys
+import os
+
+from app import app
 
 regex = re.compile(
     r'^(?:http|ftp)s?://' # http:// or https://
@@ -44,6 +50,31 @@ def check_database(model, id):
         return False
     else:
         return True
+
+def try_download_impl(id):
+    implementation = ProgramImplementation.query.filter_by(Id=id).first()
+    url = implementation.FileURL
+    if implementation.ProgramType == 'Exec':
+        filename = f'{id}_impl.exe'
+    else:
+        filename = f'{id}_impl.py'
+    filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], filename)
+    try:
+        with requests.get(url, allow_redirects=True, stream=True) as r:
+            r.raise_for_status()
+            with open(filepath, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+    except:
+        print(sys.exc_info())
+        implementation.Status = 'Incorrect'
+        db.session.commit()
+        return
+    implementation.Status = 'Working'
+    implementation.DownloadSuccess = 'True'
+    implementation.FilePath = os.path.abspath(filepath)
+    db.session.commit()
+    
 
 class dataformats(Resource):
     def get(self, id=None):
@@ -92,7 +123,6 @@ dataset_parser.add_argument('Content', type=str, required=True)
 
 class datasets(Resource):
     def get(self, id=None):
-        print(teststring)
         if id is None:
             query = DataSet.query.order_by(DataSet.Id)
             return [i.as_dict() for i in query]
@@ -248,7 +278,7 @@ implementation_parser.add_argument('TaskId', type=int, required=True)
 implementation_parser.add_argument('InputFormat', type=int, required=True)
 implementation_parser.add_argument('OutputFormat', type=int, required=True)
 implementation_parser.add_argument('CommandLineArgs', type=str)
-implementation_parser.add_argument('Blob', type=str, required=True)
+implementation_parser.add_argument('FileURL', type=str, required=True)
 implementation_parser.add_argument('DataProcessing', type=int, required=True)
 implementation_parser.add_argument('ProgramType', type=str, required=True)
 implementation_parser.add_argument('PythonRequirements', type=str)
@@ -280,10 +310,10 @@ class implementations(Resource):
         if args['ProgramType'] not in {'Python', 'Exec'}:
             return f"Unknown ProgramType={args['ProgramType']}.", 400
         
-        # if not check_uri(args['Blob']):
-        #     return f"Malformed Blob URI.", 400
-        # if (args['PythonRequirements'] is not None) and (not check_uri(args['PythonRequirements'])):
-        #     return f"Malformed PythonRequirements URI.", 400
+        if not check_uri(args['FileURL']):
+            return f"Malformed File URL.", 400
+        if (args['PythonRequirements'] is not None) and (not check_uri(args['PythonRequirements'])):
+            return f"Malformed PythonRequirements URI.", 400
         
         task = Task.query.filter_by(Id=args['TaskId']).first()
         if task.DefaultInputFormat != args['InputFormat']:
@@ -294,14 +324,15 @@ class implementations(Resource):
         baseentity = create_BaseEntity()
 
         try:
-            new_obj = ProgramImplementation(**args, BaseEntityId=baseentity.Id, Status='Working')
+            new_obj = ProgramImplementation(**args, BaseEntityId=baseentity.Id, Status='Downloading', DownloadSuccess='False')
             db.session.add(new_obj)
             db.session.commit()
         except IntegrityError as e:
-            print(e)
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
             return 'Integrity error', 400
+        
+        threading.Thread(group=None, target=try_download_impl, args=(new_obj.Id,)).start()
 
         return new_obj.as_dict(), 201
     
@@ -413,4 +444,3 @@ class run(Resource):
             return 'Integrity error', 400
 
         return new_obj.as_dict(), 201
-

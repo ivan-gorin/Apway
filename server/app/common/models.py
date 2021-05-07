@@ -1,24 +1,24 @@
 from app import db
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
+# from flask_login import UserMixin
 
-class User(UserMixin, db.Model):
-    __tablename__ = 'Users'
-    Id = db.Column(db.Integer, primary_key=True)
-    Username = db.Column(db.String(64), index=True, unique=True)
-    PasswordHash = db.Column(db.String(128))
+# class User(UserMixin, db.Model):
+#     __tablename__ = 'Users'
+#     Id = db.Column(db.Integer, primary_key=True)
+#     Username = db.Column(db.String(64), index=True, unique=True)
+#     PasswordHash = db.Column(db.String(128))
 
-    def __repr__(self):
-        return '<User {}>'.format(self.Username)
+#     def __repr__(self):
+#         return '<User {}>'.format(self.Username)
 
-    def set_password(self, password):
-        self.PasswordHash = generate_password_hash(password)
+#     def set_password(self, password):
+#         self.PasswordHash = generate_password_hash(password)
 
-    def check_password(self, password):
-        return check_password_hash(self.PasswordHash, password)
+#     def check_password(self, password):
+#         return check_password_hash(self.PasswordHash, password)
     
-    def get_id(self):
-        return (self.Id)
+#     def get_id(self):
+#         return (self.Id)
 
 class BaseEntity(db.Model):
     __tablename__ = 'BaseEntity'
@@ -27,6 +27,9 @@ class BaseEntity(db.Model):
     TimeCreated = db.Column(db.DateTime)
     TimeLastEdited = db.Column(db.DateTime)
     PreviousVersion = db.Column(db.Integer)
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Tag(db.Model):
     __tablename__ = 'Tag'
@@ -126,8 +129,10 @@ class ProgramImplementation(db.Model):
     InputFormat = db.Column(db.Integer, db.ForeignKey(DataFormat.Id))
     OutputFormat = db.Column(db.Integer, db.ForeignKey(DataFormat.Id))
     CommandLineArgs = db.Column(db.String(4000))
-    Blob = db.Column(db.String(128))
+    FileURL = db.Column(db.String(128))
+    FilePath = db.Column(db.String(256))
     DataProcessing = db.Column(db.Integer)
+    DownloadSuccess = db.Column(db.String(128))
     ProgramType = db.Column(db.String(128))
     PythonRequirements = db.Column(db.String(128))
     BaseEntityId = db.Column(db.Integer, db.ForeignKey(BaseEntity.Id))
