@@ -6,6 +6,7 @@ from flask_jwt_extended import JWTManager
 import threading
 import time
 import os
+import requests
 
 
 app = Flask(__name__)
@@ -14,15 +15,17 @@ db = SQLAlchemy(app)
 api = Api(app)
 # jwt = JWTManager(app)
 
-from app.resources.data import dataformats, datasets, tasks, environments, implementations, experiments
+from app.resources.data import RouteDataformat, RouteDataset, RouteTask,\
+     RouteEnvironment, RouteImplementation, RouteExperiment, RouteRun, RouteClient
 
-api.add_resource(dataformats, '/data/formats', '/data/formats/<int:id>')
-api.add_resource(datasets, '/data/sets', '/data/sets/<int:id>')
-api.add_resource(tasks, '/tasks', '/tasks/<int:id>')
-api.add_resource(environments, '/experiment/environments', '/experiment/environments/<int:id>')
-api.add_resource(implementations, '/implementations', '/implementations/<int:id>')
-api.add_resource(experiments, '/experiment/experiments', '/experiment/experiments/<int:id>')
-
+api.add_resource(RouteDataformat, '/data/formats', '/data/formats/<int:id>')
+api.add_resource(RouteDataset, '/data/sets', '/data/sets/<int:id>')
+api.add_resource(RouteTask, '/tasks', '/tasks/<int:id>')
+api.add_resource(RouteEnvironment, '/experiment/environments', '/experiment/environments/<int:id>')
+api.add_resource(RouteImplementation, '/implementations', '/implementations/<int:id>')
+api.add_resource(RouteExperiment, '/experiment/experiments', '/experiment/experiments/<int:id>')
+api.add_resource(RouteRun, '/experiment/run')
+api.add_resource(RouteClient, '/add_client')
 
 @app.route('/implementation_download/<path:filename>')
 def impl_download(filename):
@@ -38,15 +41,30 @@ def impl_download(filename):
     except:
         return 'Error downloading the file.', 500
 
-# @app.before_first_request
-# def before_first_request():
-#     """Start a background thread that launches tasks when machines are available."""
+from app.common.models import ExperimentResult, Client
 
-#     def launch_pending_tasks():
-#         while True:
-#             print('LOOP')
-#             time.sleep(1)
+@app.before_first_request
+def before_first_request():
+    """Start a background thread that launches tasks when machines are available."""
 
-#     if not app.config['TESTING']:
-#         thread = threading.Thread(target=launch_pending_tasks)
-#         thread.start()
+    def launch_pending_tasks():
+        while True:
+            time.sleep(5)
+            print('LOOP')
+            pending = ExperimentResult.query.filter_by(RunStatus='Pending').all()
+            if len(pending) == 0:
+                continue
+            for i in pending:
+                free_client = Client.query.filter_by(Busy=False).first()
+                if free_client is None:
+                    break
+                free_client.Busy = True
+                i.RunStatus = 'Running'
+                db.session.commit()
+                url = 'http://' + free_client.ClientIP + ':' + free_client.ClientPort + '/run/' + str(i.Id)
+                # print()
+                requests.post(url)
+
+    if not app.config['TESTING']:
+        thread = threading.Thread(target=launch_pending_tasks)
+        thread.start()

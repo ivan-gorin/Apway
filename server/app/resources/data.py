@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse
 from app.common.models import DataFormat, BaseEntity, DataSet, Task,\
- ExperimentEnvironment, ProgramImplementation, Experiment, DataSetList, ExperimentResult
+ ExperimentEnvironment, ProgramImplementation, Experiment, DataSetList, ExperimentResult, Client
 from datetime import datetime
 from app import db
 from sqlalchemy.exc import IntegrityError
@@ -23,11 +23,6 @@ regex = re.compile(
 
 def check_uri(uri):
     return re.match(regex, uri)
-
-dataformat_parser = reqparse.RequestParser()
-dataformat_parser.add_argument('FormatType', type=str, required=True)
-dataformat_parser.add_argument('FormatSchema', type=str)
-dataformat_parser.add_argument('FormatExample', type=str)
 
 def delete_BaseEntity(id):
     to_delete = BaseEntity.query.filter_by(Id=id).first()
@@ -75,8 +70,13 @@ def try_download_impl(id):
     implementation.FilePath = os.path.abspath(filepath)
     db.session.commit()
     
+dataformat_parser = reqparse.RequestParser()
+dataformat_parser.add_argument('FormatName', type=str, required=True)
+dataformat_parser.add_argument('FormatType', type=str, required=True)
+dataformat_parser.add_argument('FormatSchema', type=str)
+dataformat_parser.add_argument('FormatExample', type=str)
 
-class dataformats(Resource):
+class RouteDataformat(Resource):
     def get(self, id=None):
         if id is None:
             query = DataFormat.query.order_by(DataFormat.Id)
@@ -90,6 +90,9 @@ class dataformats(Resource):
     def post(self):
         args = dataformat_parser.parse_args(strict=True)
 
+        if args['FormatType'] not in {'File', 'Table'}:
+            return f"Unknown FormatType.", 400
+
         baseentity = create_BaseEntity()
 
         try:
@@ -99,7 +102,7 @@ class dataformats(Resource):
         except IntegrityError:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
         return new_dataformat.as_dict(), 201
 
@@ -115,13 +118,13 @@ class dataformats(Resource):
             return 200
         except IntegrityError:
             db.session.rollback()
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
 dataset_parser = reqparse.RequestParser()
 dataset_parser.add_argument('DataFormatId', type=int, required=True)
 dataset_parser.add_argument('Content', type=str, required=True)
 
-class datasets(Resource):
+class RouteDataset(Resource):
     def get(self, id=None):
         if id is None:
             query = DataSet.query.order_by(DataSet.Id)
@@ -147,7 +150,7 @@ class datasets(Resource):
         except IntegrityError:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
         return new_dataset.as_dict(), 201
     
@@ -163,7 +166,7 @@ class datasets(Resource):
             return 'Success', 200
         except IntegrityError:
             db.session.rollback()
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
 
 task_parser = reqparse.RequestParser()
@@ -174,7 +177,7 @@ task_parser.add_argument('DefaultInputFormat', type=int, required=True)
 task_parser.add_argument('DefaultOutputFormat', type=int, required=True)
 task_parser.add_argument('ResultQuality', type=str, required=True)
 
-class tasks(Resource):
+class RouteTask(Resource):
     def get(self, id=None):
         if id is None:
             query = Task.query.order_by(Task.Id)
@@ -192,6 +195,10 @@ class tasks(Resource):
             return f"DataFormat with id={args['DefaultInputFormat']} not found.", 404
         if not check_database(DataFormat, args['DefaultOutputFormat']):
             return f"DataFormat with id={args['DefaultOutputFormat']} not found.", 404
+        if args['Input'] not in {'File', 'Table'}:
+            return f"Unknown Input Type.", 400
+        if args['Output'] not in {'File', 'Table'}:
+            return f"Unknown Output Type.", 400
 
         baseentity = create_BaseEntity()
 
@@ -202,7 +209,7 @@ class tasks(Resource):
         except IntegrityError:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
         return new_task.as_dict(), 201
     
@@ -218,7 +225,7 @@ class tasks(Resource):
             return 'Success', 200
         except IntegrityError:
             db.session.rollback()
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
 
 environment_parser = reqparse.RequestParser()
@@ -227,7 +234,7 @@ environment_parser.add_argument('Processor', type=str, required=True)
 environment_parser.add_argument('Memory', type=str, required=True)
 environment_parser.add_argument('HDD', type=int, required=True)
 
-class environments(Resource):
+class RouteEnvironment(Resource):
     def get(self, id=None):
         if id is None:
             query = ExperimentEnvironment.query.order_by(ExperimentEnvironment.Id)
@@ -253,7 +260,7 @@ class environments(Resource):
         except IntegrityError:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
         return new_obj.as_dict(), 201
     
@@ -269,7 +276,7 @@ class environments(Resource):
             return 'Success', 200
         except IntegrityError:
             db.session.rollback()
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
 implementation_parser = reqparse.RequestParser()
 implementation_parser.add_argument('OS', type=str, required=True)
@@ -283,7 +290,7 @@ implementation_parser.add_argument('DataProcessing', type=int, required=True)
 implementation_parser.add_argument('ProgramType', type=str, required=True)
 implementation_parser.add_argument('PythonRequirements', type=str)
 
-class implementations(Resource):
+class RouteImplementation(Resource):
     def get(self, id=None):
         if id is None:
             query = ProgramImplementation.query.order_by(ProgramImplementation.Id)
@@ -330,7 +337,7 @@ class implementations(Resource):
         except IntegrityError as e:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
         
         threading.Thread(group=None, target=try_download_impl, args=(new_obj.Id,)).start()
 
@@ -348,7 +355,7 @@ class implementations(Resource):
             return 'Success', 200
         except IntegrityError:
             db.session.rollback()
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
 
 experiment_parser = reqparse.RequestParser()
 experiment_parser.add_argument('Title', type=str, required=True)
@@ -361,7 +368,7 @@ experiment_parser.add_argument('EnvironmentId', type=int, required=True)
 experiment_parser.add_argument('TaskId', type=int, required=True)
 
 
-class experiments(Resource):
+class RouteExperiment(Resource):
     def get(self, id=None):
         if id is None:
             query = Experiment.query.order_by(Experiment.Id)
@@ -402,7 +409,7 @@ class experiments(Resource):
         except IntegrityError as e:
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
         
         for id in datasets:
             node = DataSetList(DataSetId=id, ExperimentId=new_obj.Id)
@@ -416,7 +423,7 @@ run_parser = reqparse.RequestParser()
 run_parser.add_argument('ExperimentId', type=int, required=True)
 run_parser.add_argument('ProgramImplementationId', type=int, required=True)
 
-class run(Resource):
+class RouteRun(Resource):
     def post(self):
         args = run_parser.parse_args(strict=True)
 
@@ -435,12 +442,45 @@ class run(Resource):
         baseentity = create_BaseEntity()
 
         try:
-            new_obj = ExperimentResult(**args, BaseEntityId=baseentity.Id)
+            new_obj = ExperimentResult(**args, BaseEntityId=baseentity.Id, RunStatus='Pending')
             db.session.add(new_obj)
             db.session.commit()
         except IntegrityError as e:
+            print(e)
             db.session.rollback()
             delete_BaseEntity(baseentity.Id)
-            return 'Integrity error', 400
+            return 'Integrity Error.', 400
+
+        return new_obj.as_dict(), 201
+
+client_parser = reqparse.RequestParser()
+client_parser.add_argument('ClientIP', type=str, required=True)
+client_parser.add_argument('ClientPort', type=str, required=True)
+
+class RouteClient(Resource):
+    def get(self, id=None):
+        if id is None:
+            query = Client.query.order_by(Client.Id)
+            return [i.as_dict() for i in query]
+        else:
+            query = Client.query.filter_by(Id=id).first()
+            if query is None:
+                return f'Client with id={id} not found.', 404
+            return query.as_dict(), 200
+
+    def post(self):
+        args = client_parser.parse_args(strict=True)
+
+        try:
+            new_obj = Client(**args, Busy=False)
+            db.session.add(new_obj)
+            db.session.commit()
+        except IntegrityError as e:
+            print(e)
+            db.session.rollback()
+            return 'Integrity Error.', 400
+        
+        url = 'http://' + new_obj.ClientIP + ':' + new_obj.ClientPort + '/set_client/' + str(new_obj.Id)
+        requests.post(url)
 
         return new_obj.as_dict(), 201

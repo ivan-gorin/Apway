@@ -31,6 +31,11 @@ class BaseEntity(db.Model):
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+    # def __init__(self, author, time):
+    #     Author = author
+    #     TimeCreated = time
+    #     TimeLastEdited = time
+
 class Tag(db.Model):
     __tablename__ = 'Tag'
     Id = db.Column(db.Integer, primary_key=True)
@@ -40,6 +45,7 @@ class Tag(db.Model):
 class DataFormat(db.Model):
     __tablename__ = 'DataFormat'
     Id = db.Column(db.Integer, primary_key=True)
+    FormatName = db.Column(db.String(128))
     FormatType = db.Column(db.String(128))
     FormatSchema = db.Column(db.String(4000))
     FormatExample = db.Column(db.String(4000))
@@ -145,10 +151,14 @@ class ExperimentResult(db.Model):
     Id = db.Column(db.Integer, primary_key=True)
     ExperimentId = db.Column(db.Integer, db.ForeignKey(Experiment.Id))
     ProgramImplementationId = db.Column(db.Integer, db.ForeignKey(ProgramImplementation.Id))
+    RunStatus = db.Column(db.String(128))
     StartTime = db.Column(db.DateTime)
     StopTime = db.Column(db.DateTime)
     LogReference = db.Column(db.String(128))
     BaseEntityId = db.Column(db.Integer, db.ForeignKey(BaseEntity.Id))
+    
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class ValueList(db.Model):
     __tablename__ = 'ValueList'
@@ -161,3 +171,13 @@ class CommentList(db.Model):
     Id = db.Column(db.Integer, primary_key=True)
     Content = db.Column(db.String(4000))
     ExperimentResultId = db.Column(db.Integer, db.ForeignKey(ExperimentResult.Id))
+
+class Client(db.Model):
+    __tablename__ = 'Client'
+    Id = db.Column(db.Integer, primary_key=True)
+    ClientIP = db.Column(db.String(64))
+    ClientPort = db.Column(db.String(64))
+    Busy = db.Column(db.Boolean)
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

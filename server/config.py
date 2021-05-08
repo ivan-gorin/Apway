@@ -9,5 +9,5 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or connection_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     ENV_FILE_LOCATION = os.environ.get('ENV_FILE_LOCATION')
-    IMPLEMENTATION_DIR = r'C:\Users\ivang\Documents\PythonCode\implementations'
+    IMPLEMENTATION_DIR = os.environ.get('IMPLEMENTATION_DIR') or r'C:\Users\ivang\Documents\PythonCode\implementations'
     # SECRET_KEY = os.getenv('SECRET_KEY', 'my_precious')

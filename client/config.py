@@ -9,3 +9,7 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or connection_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     ENV_FILE_LOCATION = os.environ.get('ENV_FILE_LOCATION')
+    IMPLEMENTATION_DIR = os.environ.get('IMPLEMENTATION_DIR') or r'C:\Users\ivang\Documents\PythonCode\client_implementations'
+    OUTPUT_DIR = os.environ.get('OUTPUT_DIR') or r'C:\Users\ivang\Documents\PythonCode\client_output'
+    SERVER_ADDR = os.environ.get('SERVER_ADDR') or r'http://localhost:5000/'
+    CLIENT_ID = os.environ.get('CLIENT_ID') or None
