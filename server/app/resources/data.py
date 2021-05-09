@@ -67,7 +67,7 @@ def try_download_impl(id):
         return
     implementation.Status = 'Working'
     implementation.DownloadSuccess = 'True'
-    implementation.FilePath = os.path.abspath(filepath)
+    implementation.FilePath = filename
     db.session.commit()
     
 dataformat_parser = reqparse.RequestParser()
@@ -424,6 +424,16 @@ run_parser.add_argument('ExperimentId', type=int, required=True)
 run_parser.add_argument('ProgramImplementationId', type=int, required=True)
 
 class RouteRun(Resource):
+    def get(self, id=None):
+        if id is None:
+            query = ExperimentResult.query.order_by(ExperimentResult.Id)
+            return [i.as_dict() for i in query]
+        else:
+            query = ExperimentResult.query.filter_by(Id=id).first()
+            if query is None:
+                return f'ExperimentResult with id={id} not found.', 404
+            return query.as_dict(), 200
+
     def post(self):
         args = run_parser.parse_args(strict=True)
 

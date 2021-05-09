@@ -23,12 +23,13 @@ def run_impl(id):
     experimentresult = ExperimentResult.query.filter_by(Id=id).first()
     implementation = ProgramImplementation.query.filter_by(Id=experimentresult.ProgramImplementationId).first()
     experiment = Experiment.query.filter_by(Id=experimentresult.ExperimentId).first()
+
+    os.makedirs(app.config['IMPLEMENTATION_DIR'], exist_ok=True)
     filename = implementation.FilePath
     filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], filename)
+
     addr = parse.urljoin(app.config['SERVER_ADDR'], 'implementation_download/' + filename)
-    print(implementation.as_dict())
-    print(addr)
-    print(filepath)
+
     try:
         with requests.get(addr, stream=True) as r:
             r.raise_for_status()
@@ -50,22 +51,36 @@ def run_impl(id):
     outputformat = DataFormat.query.filter_by(Id=implementation.OutputFormat).first()
 
     datasets = DataSetList.query.filter_by(ExperimentId=experiment.Id).all()
-    idx = 0
     log = open(os.path.join(output_dir, 'log.txt'), 'wb')
 
+    idx = 0
     success = True
     for i in datasets:
-        if inputformat.FormatType == 'File':
-            # download file TODO
+        log.write((f'Running on DataSet number {idx}\n').encode('utf-8'))
 
-            print('File format not supported.')
-            input_file = 'junk'
-            # experimentresult.RunStatus = f'Failed DataSet {i.Id} Download'
-            # this_client.Busy = False
-            # db.session.commit()
-            # return
+        dataset = DataSet.query.filter_by(Id=i.DataSetId).first()
+
+        if inputformat.FormatType == 'File':
+            try:
+                with requests.get(dataset.Content, stream=True) as r:
+                    r.raise_for_status()
+                    cd = r.headers.get('content-disposition')
+                    dataset_name = re.findall('filename="(.+)"', cd)[0]
+                    dataset_path = os.path.join(args.config['IMPLEMENTATION_DIR'], dataset_name)
+                    with open(dataset_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+            except:
+                print(sys.exc_info())
+                experimentresult.RunStatus = f'Failed DataSet Id={i.DataSetId} Download'
+                this_client.Busy = False
+                db.session.commit()
+                log.close()
+                return
+
+            input_file = dataset_path
         else:
-            input_file = i.Content
+            input_file = dataset.Content
 
         cur_output_dir = os.path.join(output_dir, str(idx))
         os.makedirs(cur_output_dir, exist_ok=True)
@@ -85,14 +100,16 @@ def run_impl(id):
         idx += 1
         
     log.close()
+    stop_time = datetime.now()
     if success:
         experimentresult.RunStatus = 'Success'
-        this_client.Busy = False
-        db.session.commit()
     else:
         experimentresult.RunStatus = 'Failed to run'
-        this_client.Busy = False
-        db.session.commit()
+
+    this_client.Busy = False
+    experimentresult.StartTime = start_time
+    experimentresult.StopTime = stop_time
+    db.session.commit()
     
 class run_experiment(Resource):
     def post(self, id):
