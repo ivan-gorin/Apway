@@ -494,3 +494,23 @@ class RouteClient(Resource):
         requests.post(url)
 
         return new_obj.as_dict(), 201
+
+    def delete(self, id):
+        app.mutex.acquire()
+        to_delete = Client.query.filter_by(Id=id).first()
+        if to_delete is None:
+            return f'Client with id={id} not found.', 404
+        if to_delete.Busy:
+            return f'Client Busy.', 400
+        
+        be_id = to_delete.BaseEntityId
+        try:
+            db.session.delete(to_delete)
+            db.session.commit()
+            delete_BaseEntity(be_id)
+            app.mutex.release()
+            return 'Success', 200
+        except IntegrityError:
+            db.session.rollback()
+            app.mutex.release()
+            return 'Integrity Error.', 400

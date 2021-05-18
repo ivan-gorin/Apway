@@ -14,6 +14,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 api = Api(app)
 # jwt = JWTManager(app)
+mutex = threading.Lock()
 
 from app.resources.data import RouteDataformat, RouteDataset, RouteTask,\
      RouteEnvironment, RouteImplementation, RouteExperiment, RouteRun, RouteClient
@@ -55,14 +56,15 @@ def before_first_request():
             if len(pending) == 0:
                 continue
             for i in pending:
+                mutex.acquire()
                 free_client = Client.query.filter_by(Busy=False).first()
                 if free_client is None:
                     break
                 free_client.Busy = True
                 i.RunStatus = 'Running'
                 db.session.commit()
+                mutex.release()
                 url = 'http://' + free_client.ClientIP + ':' + free_client.ClientPort + '/run/' + str(i.Id)
-                # print()
                 requests.post(url)
 
     if not app.config['TESTING']:
