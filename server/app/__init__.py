@@ -25,7 +25,7 @@ api.add_resource(RouteEnvironment, '/experiment/environments', '/experiment/envi
 api.add_resource(RouteImplementation, '/implementations', '/implementations/<int:id>')
 api.add_resource(RouteExperiment, '/experiment/experiments', '/experiment/experiments/<int:id>')
 api.add_resource(RouteRun, '/experiment/run')
-api.add_resource(RouteClient, '/add_client')
+api.add_resource(RouteClient, '/client')
 
 @app.route('/implementation_download/<path:filename>')
 def impl_download(filename):
