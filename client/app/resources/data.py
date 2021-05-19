@@ -4,10 +4,9 @@ from app.common.models import DataFormat, BaseEntity, DataSet, Task,\
 from datetime import datetime
 from app import db
 from sqlalchemy.exc import IntegrityError
-from copy import deepcopy
 from app import app
 from urllib import parse
-import os, sys, threading, requests, subprocess, shlex
+import os, sys, threading, requests, subprocess, shlex, re, zipfile
 
 def check_database(model, id):
     query = model.query.filter_by(Id=id).first()
@@ -24,14 +23,13 @@ def run_impl(id):
     implementation = ProgramImplementation.query.filter_by(Id=experimentresult.ProgramImplementationId).first()
     experiment = Experiment.query.filter_by(Id=experimentresult.ExperimentId).first()
 
-    os.makedirs(app.config['IMPLEMENTATION_DIR'], exist_ok=True)
     filename = implementation.FilePath
-    filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], filename)
+    filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id), filename)
 
-    addr = parse.urljoin(app.config['SERVER_ADDR'], 'implementation_download/' + filename)
+    impl_addr = parse.urljoin(app.config['SERVER_ADDR'], 'implementation_download/' + filename)
 
     try:
-        with requests.get(addr, stream=True) as r:
+        with requests.get(impl_addr, stream=True) as r:
             r.raise_for_status()
             with open(filepath, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -42,6 +40,20 @@ def run_impl(id):
         this_client.Busy = False
         db.session.commit()
         return
+    
+    if implementation.ProgramType == 'PythonZip':
+        try:
+            with zipfile.ZipFile(filepath, 'r') as zipf:
+                zipf.extractall(os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id)))
+        except:
+            print(sys.exc_info())
+            experimentresult.RunStatus = 'Failed Implementation Unzip'
+            this_client.Busy = False
+            db.session.commit()
+            return
+
+        filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id), 'main.py')
+
 
     output_dir = os.path.join(app.config['OUTPUT_DIR'], str(id))
 
@@ -77,15 +89,21 @@ def run_impl(id):
                 db.session.commit()
                 log.close()
                 return
-
             input_file = dataset_path
         else:
             input_file = dataset.Content
 
-        cur_output_dir = os.path.join(output_dir, str(idx))
-        os.makedirs(cur_output_dir, exist_ok=True)
+        if outputformat.FormatType == 'File':
+            output = os.path.join(output_dir, str(idx))
+            os.makedirs(output, exist_ok=True)
+        else:
+            output = experimentresult.OutputString
 
-        args = [filepath, '--input', input_file, '--output', cur_output_dir]
+        if implementation.ProgramType == 'Exec':
+            args = [filepath, '--input', input_file, '--output', output]
+        else:
+            args = ['python', filepath, '--input', input_file, '--output', output]
+
         if implementation.CommandLineArgs is not None:
             args += shlex.split(implementation.CommandLineArgs)
 

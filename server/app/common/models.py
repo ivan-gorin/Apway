@@ -151,6 +151,7 @@ class ExperimentResult(db.Model):
     Id = db.Column(db.Integer, primary_key=True)
     ExperimentId = db.Column(db.Integer, db.ForeignKey(Experiment.Id))
     ProgramImplementationId = db.Column(db.Integer, db.ForeignKey(ProgramImplementation.Id))
+    OutputString = db.Column(db.String(256))
     RunStatus = db.Column(db.String(128))
     StartTime = db.Column(db.DateTime)
     StopTime = db.Column(db.DateTime)

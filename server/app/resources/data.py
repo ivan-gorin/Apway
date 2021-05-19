@@ -51,8 +51,10 @@ def try_download_impl(id):
     url = implementation.FileURL
     if implementation.ProgramType == 'Exec':
         filename = f'{id}_impl.exe'
-    else:
+    elif implementation.ProgramType == 'Python':
         filename = f'{id}_impl.py'
+    elif implementation.ProgramType == 'PythonZip':
+        filename = f'{id}_impl.zip'
     filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], filename)
     try:
         with requests.get(url, allow_redirects=True, stream=True) as r:
@@ -65,7 +67,7 @@ def try_download_impl(id):
         implementation.Status = 'Incorrect'
         db.session.commit()
         return
-    implementation.Status = 'Working'
+    implementation.Status = 'Active'
     implementation.DownloadSuccess = 'True'
     implementation.FilePath = filename
     db.session.commit()
@@ -314,7 +316,7 @@ class RouteImplementation(Resource):
             return f"Task with id={args['TaskId']} not found.", 404
         if args['OS'] not in {'Win', 'Linux', 'MacOS'}:
             return f"Unknown OS={args['OS']}.", 400
-        if args['ProgramType'] not in {'Python', 'Exec'}:
+        if args['ProgramType'] not in {'Python', 'PythonZip', 'Exec'}:
             return f"Unknown ProgramType={args['ProgramType']}.", 400
         
         if not check_uri(args['FileURL']):
@@ -422,6 +424,7 @@ class RouteExperiment(Resource):
 run_parser = reqparse.RequestParser()
 run_parser.add_argument('ExperimentId', type=int, required=True)
 run_parser.add_argument('ProgramImplementationId', type=int, required=True)
+run_parser.add_argument('OutputString', type=str)
 
 class RouteRun(Resource):
     def get(self, id=None):
@@ -448,6 +451,10 @@ class RouteRun(Resource):
             return f"TaskIds do not match.", 400
         if experiment.EnvironmentId != implementation.EnvironmentId:
             return f"EnvironmentIds do not match.", 400
+        
+        output_format = DataFormat.query.filter_by(Id=implementation.OutputFormat).first()
+        if output_format.FormatType == 'Table' and args['OutputString'] is None:
+            return f"OutputString required but not specified.", 400
 
         baseentity = create_BaseEntity()
 
