@@ -24,7 +24,10 @@ def run_impl(id):
     experiment = Experiment.query.filter_by(Id=experimentresult.ExperimentId).first()
 
     filename = implementation.FilePath
-    filepath = os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id), filename)
+
+    impl_dir = os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id))
+    os.makedirs(impl_dir, exist_ok=True)
+    filepath = os.path.join(impl_dir, filename)
 
     impl_addr = parse.urljoin(app.config['SERVER_ADDR'], 'implementation_download/' + filename)
 
@@ -44,7 +47,7 @@ def run_impl(id):
     if implementation.ProgramType == 'PythonZip':
         try:
             with zipfile.ZipFile(filepath, 'r') as zipf:
-                zipf.extractall(os.path.join(app.config['IMPLEMENTATION_DIR'], str(implementation.Id)))
+                zipf.extractall(impl_dir)
         except:
             print(sys.exc_info())
             experimentresult.RunStatus = 'Failed Implementation Unzip'
@@ -108,7 +111,7 @@ def run_impl(id):
             args += shlex.split(implementation.CommandLineArgs)
 
         try:
-            with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
+            with subprocess.Popen(args, stdout=subprocess.PIPE, cwd=impl_dir) as proc:
                 log.write(proc.stdout.read())
         except:
             log.write(str(sys.exc_info()))

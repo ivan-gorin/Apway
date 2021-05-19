@@ -14,6 +14,7 @@ api = Api(app)
 jwt = JWTManager(app)
 
 os.makedirs(app.config['IMPLEMENTATION_DIR'], exist_ok=True)
+os.makedirs(app.config['OUTPUT_DIR'], exist_ok=True)
 
 from app.resources.data import run_experiment
 
